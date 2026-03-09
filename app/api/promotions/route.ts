@@ -24,6 +24,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("promotions")
     .select("id, code, title, description, discount_text, enrolled_at")
+    .eq("user_id", user.id)
     .order("enrolled_at", { ascending: false });
 
   if (error) {
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
   const { data: existing } = await supabase
     .from("promotions")
     .select("id")
+    .eq("user_id", user.id)
     .eq("code", cleaned)
     .maybeSingle();
 
