@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import RequireAuth from "@/components/RequireAuth";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useAppStore } from "@/store/useAppStore";
 
 type ProfileData = {
   firstName: string;
@@ -28,6 +29,10 @@ async function parseJson<T>(response: Response): Promise<T | null> {
 
 export default function ProfilePage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const hydrate = useAppStore((s) => s.hydrate);
+  const demoProfile = useAppStore((s) => s.profile);
+  const updateProfile = useAppStore((s) => s.updateProfile);
+  const isDemoMode = !supabase;
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +52,11 @@ export default function ProfilePage() {
   const [addressProof, setAddressProof] = useState<File | null>(null);
 
   useEffect(() => {
+    if (isDemoMode) {
+      hydrate();
+      return;
+    }
+
     let mounted = true;
     (async () => {
       setLoading(true);
@@ -68,7 +78,13 @@ export default function ProfilePage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [hydrate, isDemoMode]);
+
+  useEffect(() => {
+    if (!isDemoMode) return;
+    setProfile(demoProfile as ProfileData);
+    setLoading(false);
+  }, [demoProfile, isDemoMode]);
 
   useEffect(() => {
     if (!profile) return;
@@ -236,8 +252,35 @@ export default function ProfilePage() {
                             setBusy(true);
                             setError(null);
                             try {
+                              if (isDemoMode) {
+                                const affected: Array<"firstName" | "lastName" | "dob" | "address"> = [];
+                                if (kycRequired.nameChanged) {
+                                  affected.push("firstName", "lastName");
+                                }
+                                if (kycRequired.dobChanged) affected.push("dob");
+                                if (kycRequired.addressChanged) affected.push("address");
+
+                                updateProfile(
+                                  {
+                                    firstName,
+                                    lastName,
+                                    dob,
+                                    address,
+                                    preferences: { marketingEmails },
+                                  },
+                                  affected
+                                );
+                                setEditing(false);
+                                setIdProof(null);
+                                setAddressProof(null);
+                                setCurrentPassword("");
+                                setNewPassword("");
+                                alert("Saved. Fields requiring KYC are now pending.");
+                                return;
+                              }
+
                               if (currentPassword && newPassword) {
-                                const { error: verifyError } = await supabase.auth.signInWithPassword({
+                                const { error: verifyError } = await supabase!.auth.signInWithPassword({
                                   email: profile.email,
                                   password: currentPassword,
                                 });

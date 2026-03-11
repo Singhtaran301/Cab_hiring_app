@@ -1,16 +1,26 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { useSupabaseUser } from "@/lib/supabase/useUser";
+import { useAppStore } from "@/store/useAppStore";
 
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
 
   const { user, loading, supabase } = useSupabaseUser();
-  const isAuthenticated = !!user;
+  const hydrate = useAppStore((s) => s.hydrate);
+  const localAuth = useAppStore((s) => s.auth);
+  const logoutLocal = useAppStore((s) => s.logout);
+  const isDemoMode = !supabase;
+  const isAuthenticated = isDemoMode ? localAuth.isAuthenticated : !!user;
+
+  useEffect(() => {
+    if (isDemoMode) hydrate();
+  }, [hydrate, isDemoMode]);
 
   const navTo = (path: string, requiresAuth: boolean) => {
     if (requiresAuth && !isAuthenticated) {
@@ -69,18 +79,23 @@ export default function Header() {
 
           {!isAuthenticated ? (
             <button className="btn primary" onClick={() => navTo("/auth/login", false)}>
-              Login
+              {isDemoMode ? "Demo Login" : "Login"}
             </button>
           ) : (
             <>
               <span className="pill" style={{ fontSize: 12, fontWeight: 800 }}>
-                {user?.email ?? "User"}
+                {isDemoMode ? localAuth.userId ?? "Demo User" : user?.email ?? "User"}
               </span>
               <button
                 className="btn"
                 disabled={loading}
                 onClick={async () => {
-                  await supabase.auth.signOut();
+                  if (isDemoMode) {
+                    logoutLocal();
+                    router.push("/");
+                    return;
+                  }
+                  await supabase!.auth.signOut();
                   router.push("/");
                 }}
               >

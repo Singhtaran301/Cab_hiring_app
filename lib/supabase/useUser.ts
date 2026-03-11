@@ -12,6 +12,12 @@ export function useSupabaseUser() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!supabase) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     supabase.auth

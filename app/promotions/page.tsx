@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import Header from "@/components/Header";
 import RequireAuth from "@/components/RequireAuth";
+import { useAppStore } from "@/store/useAppStore";
 
 type DbPromotion = {
   id: string;
@@ -15,6 +16,12 @@ type DbPromotion = {
 };
 
 export default function PromotionsPage() {
+  const hydrate = useAppStore((s) => s.hydrate);
+  const demoPromotions = useAppStore((s) => s.promotions);
+  const addPromotion = useAppStore((s) => s.addPromotion);
+  const deletePromotion = useAppStore((s) => s.deletePromotion);
+  const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL;
+
   const [promotions, setPromotions] = useState<DbPromotion[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -23,6 +30,11 @@ export default function PromotionsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isDemoMode) {
+      hydrate();
+      return;
+    }
+
     let mounted = true;
 
     (async () => {
@@ -51,7 +63,22 @@ export default function PromotionsPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [hydrate, isDemoMode]);
+
+  useEffect(() => {
+    if (!isDemoMode) return;
+    setPromotions(
+      demoPromotions.map((p) => ({
+        id: p.id,
+        code: p.code,
+        title: p.title,
+        description: p.description,
+        discount_text: p.discountText,
+        enrolled_at: new Date(p.enrolledAt).toISOString(),
+      }))
+    );
+    setLoading(false);
+  }, [demoPromotions, isDemoMode]);
 
   const selected = useMemo(
     () => promotions.find((p) => p.id === selectedId) || null,
@@ -91,6 +118,12 @@ export default function PromotionsPage() {
                             if (!confirm(`Delete ${p.code}?`)) return;
 
                             (async () => {
+                              if (isDemoMode) {
+                                deletePromotion(p.id);
+                                setSelectedId((current) => (current === p.id ? null : current));
+                                return;
+                              }
+
                               setBusy(true);
                               try {
                                 const res = await fetch(`/api/promotions?id=${encodeURIComponent(p.id)}`, {
@@ -132,6 +165,17 @@ export default function PromotionsPage() {
                 style={{ marginTop: 12, width: "100%" }}
                 onClick={() => {
                   (async () => {
+                    if (isDemoMode) {
+                      const result = addPromotion(code);
+                      if (!result.ok) {
+                        alert(result.message || "Add failed");
+                        return;
+                      }
+                      setCode("");
+                      alert("Code added");
+                      return;
+                    }
+
                     setBusy(true);
                     try {
                       const res = await fetch("/api/promotions", {

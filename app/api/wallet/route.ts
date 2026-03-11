@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type DbWalletRow = { uber_balance: number | string };
@@ -143,6 +144,10 @@ function isPositiveAmount(value: unknown): value is number {
 }
 
 export async function GET() {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
+  }
+
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -160,6 +165,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
+  }
+
   const supabase = createSupabaseServerClient();
   const {
     data: { user },

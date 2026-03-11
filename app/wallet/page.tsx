@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import Header from "@/components/Header";
 import RequireAuth from "@/components/RequireAuth";
+import { useAppStore } from "@/store/useAppStore";
 
 type WalletData = {
   uberBalance: number;
@@ -33,6 +34,15 @@ async function parseJson<T>(response: Response): Promise<T | null> {
 }
 
 export default function WalletPage() {
+  const hydrate = useAppStore((s) => s.hydrate);
+  const demoWallet = useAppStore((s) => s.wallet);
+  const fundUberWallet = useAppStore((s) => s.fundUberWallet);
+  const addPaymentMethod = useAppStore((s) => s.addPaymentMethod);
+  const linkAccount = useAppStore((s) => s.linkAccount);
+  const unlinkAccount = useAppStore((s) => s.unlinkAccount);
+  const transfer = useAppStore((s) => s.transfer);
+  const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL;
+
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -49,6 +59,11 @@ export default function WalletPage() {
   const [transferAmount, setTransferAmount] = useState("100");
 
   useEffect(() => {
+    if (isDemoMode) {
+      hydrate();
+      return;
+    }
+
     let mounted = true;
     (async () => {
       setLoading(true);
@@ -71,11 +86,64 @@ export default function WalletPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [hydrate, isDemoMode]);
+
+  useEffect(() => {
+    if (!isDemoMode) return;
+    setWallet(demoWallet as WalletData);
+    setLoading(false);
+  }, [demoWallet, isDemoMode]);
 
   const linkedOptions = useMemo(() => wallet?.linkedAccounts ?? [], [wallet?.linkedAccounts]);
 
   async function runAction(body: Record<string, unknown>) {
+    if (isDemoMode) {
+      const action = body.action;
+
+      if (action === "fund_wallet") {
+        fundUberWallet(Number(body.amount));
+        return true;
+      }
+
+      if (action === "add_payment_method") {
+        addPaymentMethod(
+          String(body.label ?? ""),
+          body.type as "savings" | "credit_card",
+          (body.details ?? {}) as Record<string, string>
+        );
+        return true;
+      }
+
+      if (action === "link_account") {
+        linkAccount(
+          String(body.name ?? ""),
+          body.type as "wallet" | "bank" | "card",
+          Number(body.balance ?? 0)
+        );
+        return true;
+      }
+
+      if (action === "unlink_account") {
+        unlinkAccount(String(body.linkedAccountId ?? ""));
+        return true;
+      }
+
+      if (action === "transfer") {
+        const result = transfer(
+          body.direction as "to_uber" | "from_uber",
+          String(body.linkedAccountId ?? ""),
+          Number(body.amount ?? 0)
+        );
+        if (!result.ok) {
+          const message = result.message || "Wallet action failed";
+          setError(message);
+          alert(message);
+          return false;
+        }
+        return true;
+      }
+    }
+
     setBusy(true);
     setError(null);
     try {

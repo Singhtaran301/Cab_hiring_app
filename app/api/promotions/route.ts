@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function isValidCode(code: string) {
@@ -7,6 +8,10 @@ function isValidCode(code: string) {
 }
 
 export async function GET() {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
+  }
+
   const supabase = createSupabaseServerClient();
 
   const {
@@ -35,6 +40,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
+  }
+
   const supabase = createSupabaseServerClient();
 
   const {
@@ -89,6 +98,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
+  }
+
   const supabase = createSupabaseServerClient();
 
   const {
